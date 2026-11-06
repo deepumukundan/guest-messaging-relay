@@ -6,6 +6,8 @@ import worker from "../src/index";
 import {
   emitPayloadShape,
   payloadShape,
+  SHAPE_DIAGNOSTICS,
+  SHAPE_DIAGNOSTICS_SOURCES,
   SHAPE_MAX_BYTES,
   SHAPE_MAX_DEPTH,
   SHAPE_TRUNCATED,
@@ -197,6 +199,8 @@ describe("payload shape redactor", () => {
   });
 
   it("emits unparsed for invalid JSON and never throws", () => {
+    expect(SHAPE_DIAGNOSTICS).toBe(true);
+    expect([...SHAPE_DIAGNOSTICS_SOURCES]).toEqual(["whatsapp"]);
     const lines: string[] = [];
     const log = vi.spyOn(console, "log").mockImplementation((message?: unknown) => {
       lines.push(String(message));
@@ -207,12 +211,12 @@ describe("payload shape redactor", () => {
       log.mockImplementation(() => {
         throw new Error("log failed");
       });
-      expect(() => emitPayloadShape(RELAY, "quo", new TextEncoder().encode("{}"), null, null)).not.toThrow();
+      expect(() => emitPayloadShape(RELAY, "whatsapp", new TextEncoder().encode("{}"), null, null)).not.toThrow();
     } finally {
       log.mockRestore();
     }
-    expect(JSON.parse(lines[0])).toMatchObject({ diag: "payload_shape", shape: "unparsed", source: "quo" });
-    expect(JSON.parse(lines[1])).toMatchObject({ diag: "payload_shape", shape: "unparsed", source: "whatsapp" });
+    expect(lines).toHaveLength(1);
+    expect(JSON.parse(lines[0])).toMatchObject({ diag: "payload_shape", shape: "unparsed", source: "whatsapp" });
     expect(lines[0]).not.toContain("not-json");
   });
 });
@@ -346,7 +350,7 @@ describe("payload shape diagnostics on verified routes", () => {
     logs.restore();
   });
 
-  it("logs one Quo shape after a good signature and still forwards", async () => {
+  it("forwards a legacy Quo message and does not emit a shape line", async () => {
     const captured = { count: 0 };
     network.use(
       http.post(ROUTINE_URL, () => {
@@ -380,22 +384,7 @@ describe("payload shape diagnostics on verified routes", () => {
     await settle(ctx);
     expect(captured.count).toBe(1);
 
-    const diags = diagLogs(logs.lines);
-    expect(diags).toHaveLength(1);
-    expect(Object.keys(diags[0]).sort()).toEqual(["diag", "outcome", "reason", "relay", "shape", "source"]);
-    expect(diags[0]).toMatchObject({
-      relay: RELAY,
-      diag: "payload_shape",
-      source: "quo",
-      outcome: null,
-      reason: null,
-    });
-    const shape = diags[0].shape as ObjectShape;
-    expect(shape.type).toBe("message.received");
-    expect(shape.apiVersion).toBe("v2");
-    expect(shape.object).toBe("event");
-    expect(asObject(asObject(shape.data).object).direction).toBe("incoming");
-    expect(asObject(asObject(shape.data).object).status).toBe("received");
+    expect(diagLogs(logs.lines)).toEqual([]);
     expect(statusLogs(logs.lines).map((entry) => entry.outcome)).toEqual(["forwarded"]);
 
     const logged = logs.lines.join("\n");
@@ -407,7 +396,14 @@ describe("payload shape diagnostics on verified routes", () => {
     expect(logged).not.toContain(QUO_SECRET);
   });
 
-  it("logs the direction decision for a message.received payload with no data.object", async () => {
+  it("does not emit a shape line for a current-format Quo message", async () => {
+    const captured = { count: 0 };
+    network.use(
+      http.post(ROUTINE_URL, () => {
+        captured.count += 1;
+        return HttpResponse.json({ ok: true });
+      }),
+    );
     const raw = JSON.stringify({
       id: "EV-resource",
       apiVersion: "2026-03-30",
@@ -431,16 +427,11 @@ describe("payload shape diagnostics on verified routes", () => {
     expect(response.status).toBe(200);
     expect(await response.json()).toEqual({ ok: true });
     await settle(ctx);
+    expect(captured.count).toBe(1);
+    expect(diagLogs(logs.lines)).toEqual([]);
     expect(statusLogs(logs.lines)).toContainEqual(
-      expect.objectContaining({ source: "quo", outcome: "ignored", reason: "direction", event_type: "message.received" }),
+      expect.objectContaining({ source: "quo", outcome: "forwarded", event_type: "message.received", message_id: "AC-resource" }),
     );
-    const diags = diagLogs(logs.lines);
-    expect(diags).toHaveLength(1);
-    expect(diags[0]).toMatchObject({ source: "quo", outcome: "ignored", reason: "direction" });
-    const data = asObject((diags[0].shape as ObjectShape).data);
-    expect(data.object).toBeUndefined();
-    expect(asObject(data.resource).direction).toBe("incoming");
-    expect(asObject(data.resource).text).toBe(`string(len=${BODY_CANARY.length})`);
     expect(logs.lines.join("\n")).not.toContain(BODY_CANARY);
     expect(logs.lines.join("\n")).not.toContain(PHONE_CANARY);
   });
@@ -649,21 +640,21 @@ describe("payload shape diagnostics on verified routes", () => {
     expect(quo.response.status).toBe(400);
     expect(await quo.response.json()).toEqual({ error: "invalid_payload" });
     await settle(quo.ctx);
-    expect(diagLogs(logs.lines)).toEqual([
-      expect.objectContaining({ source: "quo", outcome: "invalid_payload", reason: null, shape: "unparsed" }),
-    ]);
+    expect(diagLogs(logs.lines)).toEqual([]);
 
     const waRaw = "{";
     const wa = await post(whatsappUrl(), waRaw, { "X-Hub-Signature-256": await metaHeader(waRaw) });
     expect(wa.response.status).toBe(200);
     expect(await wa.response.json()).toEqual({ ok: true });
     await settle(wa.ctx);
-    expect(diagLogs(logs.lines)[1]).toMatchObject({
-      source: "whatsapp",
-      outcome: "invalid_payload",
-      reason: null,
-      shape: "unparsed",
-    });
+    expect(diagLogs(logs.lines)).toEqual([
+      expect.objectContaining({
+        source: "whatsapp",
+        outcome: "invalid_payload",
+        reason: null,
+        shape: "unparsed",
+      }),
+    ]);
     expect(logs.lines.join("\n")).not.toContain("not-json");
   });
 });

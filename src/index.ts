@@ -873,6 +873,13 @@ function platformOf(data: Record<string, unknown>): string | null {
   return asString(data.platform) ?? nestedString(data.listing, "platform");
 }
 
+function asRecord(value: unknown): Record<string, unknown> | null {
+  if (!value || typeof value !== "object" || Array.isArray(value)) {
+    return null;
+  }
+  return value as Record<string, unknown>;
+}
+
 function nestedString(value: unknown, key: string): string | null {
   if (!value || typeof value !== "object" || Array.isArray(value)) {
     return null;
@@ -1063,9 +1070,10 @@ function logSource(
 }
 
 /**
- * Extra shape line for a verified Quo or WhatsApp POST. `outcome` is null when
- * the request was accepted for delivery; the queue status line still reports
- * forwarded or forward_failed. Failures here must not change the response.
+ * Extra shape line for a verified POST on a source that still has diagnostics
+ * enabled. `outcome` is null when the request was accepted for delivery; the
+ * queue status line still reports forwarded or forward_failed. Failures here
+ * must not change the response.
  */
 function logShape(
   source: "quo" | "whatsapp",
@@ -1160,14 +1168,9 @@ async function handleQuo(request: Request, env: Env, ctx: ExecutionContext): Pro
 
   const eventType = safeToken(asString(record.type));
   const eventId = safeId(asString(record.id));
-  const data =
-    record.data && typeof record.data === "object" && !Array.isArray(record.data)
-      ? (record.data as Record<string, unknown>)
-      : null;
-  const message =
-    data?.object && typeof data.object === "object" && !Array.isArray(data.object)
-      ? (data.object as Record<string, unknown>)
-      : null;
+  const data = asRecord(record.data);
+  // Current Quo (api version 2026-03-30) sends data.resource. Older webhooks send data.object.
+  const message = asRecord(data?.object) ?? asRecord(data?.resource);
   const messageId = message ? asString(message.id) : null;
   const loggedMessageId = safeId(messageId);
 
@@ -1197,7 +1200,8 @@ async function handleQuo(request: Request, env: Env, ctx: ExecutionContext): Pro
     return json({ ok: true }, 200);
   }
 
-  const line = receivingLine(message.to);
+  const context = asRecord(data?.context);
+  const line = receivingLine(message.to) ?? receivingLine(context?.recipientIdentifiers);
 
   if (!messageId) {
     logSource("quo", {
@@ -1238,7 +1242,9 @@ async function handleQuo(request: Request, env: Env, ctx: ExecutionContext): Pro
     return json({ ok: true }, 200);
   }
 
-  const phone = normalizeE164(asString(message.from) ?? "");
+  const phone =
+    normalizeE164(asString(message.from) ?? "") ??
+    normalizeE164(asString(context?.senderIdentifier) ?? "");
   const createdAt =
     asIsoTimestamp(message.createdAt) ?? asIsoTimestamp(record.createdAt) ?? new Date().toISOString();
   const payload = buildRelayMessage({
@@ -1718,7 +1724,7 @@ function parseJsonObject(body: Uint8Array): Record<string, unknown> | null {
   }
 }
 
-/** First E.164 number in Quo `to` (string or array). That is the receiving line. */
+/** First E.164 number in a string or array. That is the Quo receiving line. */
 function receivingLine(to: unknown): string | null {
   const values = Array.isArray(to) ? to : [to];
   for (const value of values) {
