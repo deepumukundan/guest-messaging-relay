@@ -276,8 +276,31 @@ Rejected requests never touch KV, the queue, or the bot, so junk traffic can't u
 - **Volumetric attacks** are absorbed by Cloudflare's automatic DDoS protection, which covers `workers.dev`.
 - **Request floods** that get past it still run the Worker, which rejects them cheaply. On the Workers Free plan they count toward the 100,000 requests a day; once that is spent, the relay answers with an error until 00:00 UTC and the channels' own retries carry the backlog. On Free a flood can't cost money; on Paid every request is billed.
 - **A Workers rate-limit binding is not used.** It runs inside the Worker, so the request has already been counted, and rejected requests already do no costly work. The defence that saves the quota is a WAF rule at the edge.
-- **Edge rules need a zone.** `workers.dev` can't have WAF custom rules or rate-limiting rules. The README's optional section moves the relay to a Custom Domain on the user's zone (`routes` with `custom_domain: true`), adds three custom rules (relay paths only, GET/HEAD/POST only, Hospitable path only from `38.80.170.0/24`) and one rate-limiting rule on `/hook/`, then sets `workers_dev` to `false` so the edge rules can't be bypassed. `workers_dev` in `wrangler.jsonc` is applied on every deploy, so turning `workers.dev` off in the dashboard alone is undone by the next build.
+- **Edge rules need a zone.** `workers.dev` can't have WAF custom rules or rate-limiting rules. The steps in [Own domain and firewall rules](#own-domain-and-firewall-rules) move the relay to a Custom Domain on the user's zone (`routes` with `custom_domain: true`), adds three custom rules (relay paths only, GET/HEAD/POST only, Hospitable path only from `38.80.170.0/24`) and one rate-limiting rule on `/hook/`, then sets `workers_dev` to `false` so the edge rules can't be bypassed. `workers_dev` in `wrangler.jsonc` is applied on every deploy, so turning `workers.dev` off in the dashboard alone is undone by the next build.
 - **Challenges break webhooks.** "I'm Under Attack" mode, Bot Fight Mode, and managed challenges on the relay's hostname would stop Hospitable, Quo, and Meta, which can't run JavaScript challenges.
+
+### Own domain and firewall rules
+
+The `workers.dev` address can't have firewall rules. If you have a domain on Cloudflare (the free plan is enough), Cloudflare's firewall can block junk requests at the edge, so they never use up the relay's daily requests. Do these in order, so no messages are lost while you switch.
+
+1. **Add a relay address on your domain.** In your relay's GitHub repository, open `wrangler.jsonc`, click the pencil icon, and add this line below `"workers_dev": true,`, using your own domain:
+
+   ```jsonc
+   "routes": [{ "pattern": "relay.yourdomain.com", "custom_domain": true }],
+   ```
+
+   Click **Commit changes**. Cloudflare redeploys the relay in a minute or two.
+2. **Move your channels to the new address.** Open `https://relay.yourdomain.com`, check your password, and copy each link into Hospitable, Quo, and your Meta app in place of the old one. Test each channel.
+3. **Add firewall rules.** In Cloudflare, open your domain, then **Security → WAF → Custom rules**, and create these. For each, click **Edit expression**, paste the expression, choose **Block**, and **Deploy**.
+
+   | Rule name | Expression |
+   | --- | --- |
+   | Relay: only relay paths | `(http.host eq "relay.yourdomain.com" and not (http.request.uri.path eq "/" or starts_with(http.request.uri.path, "/hook/")))` |
+   | Relay: only GET and POST | `(http.host eq "relay.yourdomain.com" and not http.request.method in {"GET" "HEAD" "POST"})` |
+   | Relay: Hospitable only from Hospitable | `(http.host eq "relay.yourdomain.com" and ends_with(http.request.uri.path, "/hospitable") and not ip.src in {38.80.170.0/24})` |
+
+4. **Add a rate limit.** Under **Security → WAF → Rate limiting rules**, create a rule for requests where **Hostname** equals `relay.yourdomain.com` and **URI Path** starts with `/hook/`, counted by **IP**, at more than **50 requests per 10 seconds**, with action **Block** for the shortest time offered. If your plan offers fewer choices, pick the closest ones.
+5. **Turn off the old address.** Once every channel works on the new address, edit `wrangler.jsonc` again, change `"workers_dev": true` to `"workers_dev": false`, and commit. The `workers.dev` address then stops answering, so nobody can go around your firewall rules. Your setup page is now at `https://relay.yourdomain.com`.
 
 ### What a leaked relay password allows
 
