@@ -112,6 +112,21 @@ Do these in order, because Meta checks the link right away.
 2. Go to **Settings → Variables and Secrets** and click **Add**.
 3. Choose type **Secret**, enter the name and value, and click **Deploy**.
 
+## Security
+
+Your relay is already protected. Only Hospitable, Quo, and Meta can send it messages, and Cloudflare blocks attacks on it automatically. You don't need to do anything else.
+
+<details>
+<summary><strong>Want extra protection? Three optional tips</strong></summary>
+
+1. **Add Hospitable's signing secret.** If your Hospitable webhook shows a signing secret, add it in Cloudflare as a secret named `HOSPITABLE_WEBHOOK_SECRET` (see [adding a secret](#adding-a-secret)). Then click **Test** on the webhook in Hospitable. If your bot doesn't get the test, delete that secret again and everything works as before. Your setup page shows which protection Hospitable has.
+2. **Stay on Cloudflare's free plan.** On the free plan, junk traffic can never cost you money. At worst, the relay pauses until the next day.
+3. **Leave "I'm Under Attack" mode and Bot Fight Mode off** in Cloudflare. They would block Hospitable, Quo, and Meta too, and your messages would stop arriving.
+
+Have your own domain on Cloudflare? You can also add firewall rules that block junk traffic before it reaches the relay. This is optional and a bit more technical; see [the step-by-step guide](docs/TECHNICAL.md#own-domain-and-firewall-rules).
+
+</details>
+
 ## Something not working?
 
 <details>
@@ -133,7 +148,8 @@ In Cloudflare, open your relay, then **Logs**, and look at the `outcome` of the 
 | --- | --- |
 | `forwarded` | Delivered. Check your Grok Bot routine. |
 | `forward_failed` | Your bot didn't accept it. Check the Grok Bot URL and key. The relay keeps retrying for about 15 hours. |
-| `rejected_signature` | A Quo or WhatsApp secret doesn't match. Add it again. |
+| `rejected_signature` | A Quo, WhatsApp, or Hospitable secret doesn't match. Add it again. |
+| `rejected_ip` | A request on the Hospitable link didn't come from Hospitable. Expected for junk traffic. |
 | `dormant` | That channel's secret isn't set yet. |
 | `rejected_path` | The webhook link is wrong. Copy it again from your setup page. |
 | `dropped_non_guest` | The message was from you or an automation, not a guest. That's expected. |

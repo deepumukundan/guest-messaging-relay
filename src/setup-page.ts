@@ -82,6 +82,7 @@ export const SETUP_PAGE_HTML = `<!doctype html>
         <li>Select <strong>Messages</strong>, <strong>Reservations</strong>, and <strong>Reviews</strong>, then <strong>Save</strong>.</li>
         <li>Click <strong>Test</strong>. Your Grok Bot should receive a message.</li>
       </ol>
+      <div id="protection" class="notice" hidden></div>
     </section>
 
     <section class="card" data-channel="quo">
@@ -140,6 +141,21 @@ export const SETUP_PAGE_HTML = `<!doctype html>
     el.className = "badge " + (ready ? "ok" : "warn");
   }
 
+  function protection(p) {
+    var el = document.getElementById("protection");
+    if (p.hospitable_ip_check === false) {
+      el.className = "notice bad";
+      el.textContent = "The Hospitable IP check is off, so anyone with this link can post to it. Remove ENFORCE_HOSPITABLE_IP in Cloudflare unless a proxy sits in front of the relay.";
+    } else if (p.hospitable_signature === true) {
+      el.className = "notice ok";
+      el.textContent = "Protection: only Hospitable's servers, with your signing secret, can use this link.";
+    } else {
+      el.className = "notice warn";
+      el.textContent = "Protection: only Hospitable's servers can use this link. For extra protection, add Hospitable's signing secret as HOSPITABLE_WEBHOOK_SECRET (see the README's Security section).";
+    }
+    el.hidden = false;
+  }
+
   form.addEventListener("submit", function (event) {
     event.preventDefault();
     var password = input.value.trim();
@@ -163,6 +179,7 @@ export const SETUP_PAGE_HTML = `<!doctype html>
             var ready = ch[name] === true;
             badge(section, ready, "Ready", name === "hospitable" ? "Ready" : "Needs a secret");
           });
+          protection(answer.body.protection || {});
           channels.hidden = false;
         } else if (answer.status === 404) {
           say("bad", "That password doesn't match this relay. Check for typos, or copy it again from your password manager.");

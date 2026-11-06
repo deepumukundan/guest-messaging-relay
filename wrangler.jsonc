@@ -8,15 +8,18 @@
   "workers_dev": true,
   // No preview addresses for test versions; only the live relay gets messages.
   "preview_urls": false,
+  // Logs keep only the relay's own JSON status lines. Cloudflare's automatic
+  // invocation logs and traces record each request URL, and every webhook URL
+  // contains the relay password, so both are off.
   "observability": {
     "enabled": true,
     "logs": {
       "enabled": true,
-      "head_sampling_rate": 1
+      "head_sampling_rate": 1,
+      "invocation_logs": false
     },
     "traces": {
-      "enabled": true,
-      "head_sampling_rate": 1
+      "enabled": false
     }
   },
   // No required plain-text vars. The Hospitable IP check is on unless

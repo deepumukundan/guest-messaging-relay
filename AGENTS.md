@@ -36,7 +36,8 @@ Setup is done in the human's web browser with the **Deploy to Cloudflare** butto
    - **WhatsApp:** this works only with a WhatsApp Business number connected to a Meta app (WhatsApp Cloud API). The regular WhatsApp app, or the WhatsApp Business app on its own, can't send webhooks. Both WhatsApp secrets must be added before the human saves the callback URL in Meta. The setup page shows **Ready** once they are.
    - **Quo:** the signing secret appears after the webhook is created, so the order is webhook first, then the secret.
    - New secrets are added in Cloudflare under **Workers & Pages → their relay → Settings → Variables and Secrets** as type **Secret**, then **Deploy**.
-5. **Test.** Ask the human to send a message to one of their numbers. The bot should get it within seconds. If not, have them read the `outcome` field under **Logs** for the Worker, and use the table in [README.md](README.md#check-that-it-works).
+5. **Test.** Ask the human to send a message to one of their numbers. The bot should get it within seconds. If not, have them read the `outcome` field under **Logs** for the Worker, and use the table in [README.md](README.md#something-not-working).
+6. **Protection** (README "Security" section). Offer the recommended steps: the Hospitable signing secret (`HOSPITABLE_WEBHOOK_SECRET`, then **Test**; remove it again if logs show `rejected_signature`), staying on the Workers Free plan, and leaving "I'm Under Attack" mode and Bot Fight Mode off for the relay. The own-domain firewall setup ([docs/TECHNICAL.md](docs/TECHNICAL.md#own-domain-and-firewall-rules)) is optional and only for humans who already have a domain on Cloudflare. Follow its order exactly: add the custom domain, move every channel to the new links and test them, add the rules, and only then set `workers_dev` to `false`. Doing these is the human's choice; they make the changes themselves.
 
 ### If the deploy fails
 
