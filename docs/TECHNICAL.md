@@ -71,7 +71,9 @@ The README's button:
 - Asks for the secrets left uncommented in [`.dev.vars.example`](../.dev.vars.example), with help text from `cloudflare.bindings` in `package.json`.
 - Sets up Workers Builds, so every push to the copy's main branch redeploys it.
 
-`wrangler.jsonc` keeps placeholder resource names and ids (`00000000000000000000000000000000` for KV) because the button needs defaults to replace. Queue names are fixed. Two relays in one account need different queue names, because a queue can have only one consumer.
+The button needs default resource names and ids to replace, so `wrangler.jsonc` keeps the author's KV id. A copy gets its own namespace and id. Queue names are fixed. Two relays in one account need different queue names, because a queue can have only one consumer.
+
+The copy starts as a single commit, and it doesn't include `.github/workflows`, so tests don't run on GitHub in a copy. `workers_dev` is on because the setup page and webhook links use the `workers.dev` address. `preview_urls` is off, so test versions don't get their own address.
 
 ### Deploy from your own computer
 

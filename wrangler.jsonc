@@ -4,6 +4,10 @@
   "main": "src/index.ts",
   "compatibility_date": "2026-11-02",
   "compatibility_flags": ["nodejs_compat"],
+  // The setup page and webhook links live on the workers.dev address.
+  "workers_dev": true,
+  // No preview addresses for test versions; only the live relay gets messages.
+  "preview_urls": false,
   "observability": {
     "enabled": true,
     "logs": {
@@ -47,8 +51,8 @@
   "kv_namespaces": [
     {
       "binding": "DEDUPE",
-      // Placeholder. The Deploy to Cloudflare button creates the namespace and
-      // writes its id here in your copy of the repository.
+      // The Deploy to Cloudflare button creates a new namespace and writes its
+      // id here in your copy of the repository.
       "id": "8e94417c257643649cc5cb98f0bbc48d"
     }
   ]
