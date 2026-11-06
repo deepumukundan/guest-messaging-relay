@@ -1,0 +1,29 @@
+# Worker secrets. The "Deploy to Cloudflare" button asks for the three
+# uncommented values below. Never commit real values.
+# For local `wrangler dev`, copy this file to .dev.vars and fill it in.
+
+# Relay password: at least 32 random letters and digits. It is part of every
+# webhook link. Generate one with: openssl rand -hex 32
+RELAY_PATH_TOKEN=
+
+# Your Grok Bot routine's webhook URL (https).
+RESPONDER_WEBHOOK_URL=
+
+# The routine's key (crsr_...). "Bearer " is added if you leave it out.
+RESPONDER_AUTH_HEADER=
+
+# Optional. Add these later in Cloudflare under
+# Workers & Pages > your relay > Settings > Variables and Secrets (type: Secret).
+
+# Quo signing secret. Current webhooks use whsec_<base64>.
+# QUO_WEBHOOK_SECRET=
+
+# WhatsApp: both must be set or the WhatsApp link returns 503.
+# WHATSAPP_VERIFY_TOKEN=
+# WHATSAPP_APP_SECRET=
+
+# Hospitable signing secret. When set, a valid Signature header is required.
+# HOSPITABLE_WEBHOOK_SECRET=
+
+# Only the exact value "false" turns the Hospitable IP check off.
+# ENFORCE_HOSPITABLE_IP=false

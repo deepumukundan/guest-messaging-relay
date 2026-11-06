@@ -1,0 +1,55 @@
+{
+  "$schema": "./node_modules/wrangler/config-schema.json",
+  "name": "guest-messaging-relay",
+  "main": "src/index.ts",
+  "compatibility_date": "2026-11-02",
+  "compatibility_flags": ["nodejs_compat"],
+  "observability": {
+    "enabled": true,
+    "logs": {
+      "enabled": true,
+      "head_sampling_rate": 1
+    },
+    "traces": {
+      "enabled": true,
+      "head_sampling_rate": 1
+    }
+  },
+  // No required plain-text vars. The Hospitable IP check is on unless
+  // ENFORCE_HOSPITABLE_IP is the exact string "false".
+  // Secrets are not stored here. The Deploy to Cloudflare button asks for the
+  // required ones; add others in Cloudflare under Settings > Variables and Secrets.
+  // A deploy does not delete secrets that are already on the Worker.
+  "secrets": {
+    "required": [
+      "RELAY_PATH_TOKEN",
+      "RESPONDER_WEBHOOK_URL",
+      "RESPONDER_AUTH_HEADER"
+    ]
+  },
+  // Delivery queue. The Deploy to Cloudflare button creates it. The
+  // dead-letter queue holds jobs that still failed after max_retries.
+  // max_retries must match MAX_DELIVERY_RETRIES in src/index.ts.
+  "queues": {
+    "producers": [
+      { "binding": "DELIVERY", "queue": "guest-messaging-relay-delivery" }
+    ],
+    "consumers": [
+      {
+        "queue": "guest-messaging-relay-delivery",
+        "max_batch_size": 10,
+        "max_batch_timeout": 1,
+        "max_retries": 20,
+        "dead_letter_queue": "guest-messaging-relay-delivery-dlq"
+      }
+    ]
+  },
+  "kv_namespaces": [
+    {
+      "binding": "DEDUPE",
+      // Placeholder. The Deploy to Cloudflare button creates the namespace and
+      // writes its id here in your copy of the repository.
+      "id": "8e94417c257643649cc5cb98f0bbc48d"
+    }
+  ]
+}

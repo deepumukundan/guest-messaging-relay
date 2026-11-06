@@ -1,0 +1,12 @@
+node_modules/
+.wrangler/
+.dev.vars
+.dev.vars.*
+!.dev.vars.example
+dist/
+coverage/
+.playwright-mcp/
+*.log
+.env
+.env.*
+.DS_Store
