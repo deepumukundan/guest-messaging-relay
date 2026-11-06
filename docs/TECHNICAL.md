@@ -35,11 +35,13 @@ Reviews and reservation creates/changes from Hospitable are forwarded too, in Ho
 
 Logs are one JSON status line per decision: `relay`, `source`, `outcome`, and ids. They do not include message text, names, or full phone numbers.
 
+Cloudflare's automatic invocation logs and traces are off in `wrangler.jsonc` (`observability.logs.invocation_logs: false`, `observability.traces.enabled: false`). Both record the request URL, and every webhook URL contains `RELAY_PATH_TOKEN`. Turning them back on writes the relay password into Workers Logs. Live `wrangler tail` still shows URLs to whoever runs it.
+
 ### Setup page and status check
 
 - **`GET /`** serves a static setup page ([src/setup-page.ts](../src/setup-page.ts)). It contains no secrets and is served even before the required secrets are set. Headers: a strict Content-Security-Policy (`connect-src 'self'`, `frame-ancestors 'none'`), `no-store`, and `no-referrer`.
 - **The page** asks for the relay password and calls `GET /hook/<password>/status` on the same relay. It never stores the password.
-- **`GET /hook/<token>/status`** answers `{"relay":"ok","channels":{"hospitable":true,"quo":bool,"whatsapp":bool}}`, which says only whether each channel's secrets are set. A wrong token gets **404**, a non-GET request gets **405**, and incomplete settings get **500**.
+- **`GET /hook/<token>/status`** answers `{"relay":"ok","channels":{"hospitable":true,"quo":bool,"whatsapp":bool},"protection":{"hospitable_ip_check":bool,"hospitable_signature":bool}}`, which says only whether each channel's secrets are set and which optional Hospitable checks are on. The page shows the protection level under the Hospitable link. A wrong token gets **404**, a non-GET request gets **405**, and incomplete settings get **500**.
 
 ## 2. Delivery, retries, and limits
 
@@ -252,3 +254,31 @@ The line does not include the message, the guest's name, or a full phone number.
 ### Temporary payload-shape diagnostics
 
 While `SHAPE_DIAGNOSTICS` is `true` in [src/shape-diagnostics.ts](../src/shape-diagnostics.ts), a verified POST from a source listed in `SHAPE_DIAGNOSTICS_SOURCES` adds one extra JSON line: `diag` is `payload_shape`, plus `source`, `outcome`, `reason`, and `shape`. Quo is no longer in that set. WhatsApp still is, until its first live tests. `shape` is field names and JSON types. A few enum keys (`type`, `direction`, `status`, `apiVersion`, and the other names in that file) include the value only when it is a short token. Message text, names, phone numbers, emails, ids, URLs, headers, and secrets are not logged. Rejected requests, Hospitable, and the WhatsApp handshake do not emit the line. `outcome` is null when the POST was accepted for delivery; the queue line still reports `forwarded` or `forward_failed`. Delete the module and its call sites after the WhatsApp samples are captured.
+
+## 11. Security model
+
+### Checks in the Worker
+
+| Layer | What it stops | Where |
+| --- | --- | --- |
+| Path token | Anyone without the link. Constant-time compare; 32+ letters and digits (190+ bits for the suggested 40), so guessing is not practical. Wrong token is **404** before any KV, queue, or body read. | `matchRoute` |
+| Hospitable source IP | Requests not from `38.80.170.0/24`. `CF-Connecting-IP` is set by Cloudflare and can't be forged by the client. Checked before the body is read. | `isHospitableSourceIp` |
+| Hospitable signature (optional) | Another Hospitable account, or anything else inside Hospitable's range, posting to a leaked link. On only when `HOSPITABLE_WEBHOOK_SECRET` is set. | `verifySignature` |
+| Quo signature + 5-minute window | Forged and old replayed requests. Always required; no secret means **503**. | `verifyQuoRequest` |
+| Meta signature | Forged WhatsApp requests. Always required; either secret missing means **503**. | `verifyMetaSignature` |
+| Body cap (1 MB), text cap (4000 chars) | Memory and queue abuse. | `readBoundedBody`, `capText` |
+| Dedupe (24 h) | A replayed message reaching the bot twice within a day. WhatsApp and Hospitable signatures carry no timestamp, so a captured request replayed after 24 hours would be forwarded again; capturing one needs a break in TLS. | KV `DEDUPE` |
+
+Rejected requests never touch KV, the queue, or the bot, so junk traffic can't use up those quotas or reach the bot. The bot only ever receives the relay's own JSON, never the raw request.
+
+### Denial of service
+
+- **Volumetric attacks** are absorbed by Cloudflare's automatic DDoS protection, which covers `workers.dev`.
+- **Request floods** that get past it still run the Worker, which rejects them cheaply. On the Workers Free plan they count toward the 100,000 requests a day; once that is spent, the relay answers with an error until 00:00 UTC and the channels' own retries carry the backlog. On Free a flood can't cost money; on Paid every request is billed.
+- **A Workers rate-limit binding is not used.** It runs inside the Worker, so the request has already been counted, and rejected requests already do no costly work. The defence that saves the quota is a WAF rule at the edge.
+- **Edge rules need a zone.** `workers.dev` can't have WAF custom rules or rate-limiting rules. The README's optional section moves the relay to a Custom Domain on the user's zone (`routes` with `custom_domain: true`), adds three custom rules (relay paths only, GET/HEAD/POST only, Hospitable path only from `38.80.170.0/24`) and one rate-limiting rule on `/hook/`, then sets `workers_dev` to `false` so the edge rules can't be bypassed. `workers_dev` in `wrangler.jsonc` is applied on every deploy, so turning `workers.dev` off in the dashboard alone is undone by the next build.
+- **Challenges break webhooks.** "I'm Under Attack" mode, Bot Fight Mode, and managed challenges on the relay's hostname would stop Hospitable, Quo, and Meta, which can't run JavaScript challenges.
+
+### What a leaked relay password allows
+
+With the link alone, an attacker can read the status endpoint (which channels are set up; no secret values) and pass the WhatsApp verify handshake only if they also know `WHATSAPP_VERIFY_TOKEN`. They still can't get a message to the bot: Hospitable needs Hospitable's IP range (and the signing secret, when set), Quo needs the Quo signing secret, and WhatsApp needs the Meta app secret. Rotate `RELAY_PATH_TOKEN` and update each channel's link anyway.

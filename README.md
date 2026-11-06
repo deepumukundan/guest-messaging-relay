@@ -112,6 +112,52 @@ Do these in order, because Meta checks the link right away.
 2. Go to **Settings → Variables and Secrets** and click **Add**.
 3. Choose type **Secret**, enter the name and value, and click **Deploy**.
 
+## Security
+
+### Already on (nothing to do)
+
+- **Secret links.** Every webhook link contains your relay password. A request with the wrong link gets *not found* before anything else runs.
+- **Hospitable** links accept only Hospitable's servers (their published address range, `38.80.170.0/24`).
+- **Quo** requests must carry Quo's signature, made with your signing secret, and be less than 5 minutes old.
+- **WhatsApp** requests must carry Meta's signature, made with your Meta app secret.
+- **Limits.** Requests over 1 MB are refused, and a repeated message is forwarded only once.
+- **Cloudflare DDoS protection** is automatic on every Cloudflare plan, including the free `workers.dev` address.
+- **No secrets in logs.** The relay password is part of every link, so Cloudflare's automatic request logs and traces are turned off. Only the relay's own status lines are kept.
+
+Your setup page shows Hospitable's protection level under the Hospitable link.
+
+### Recommended
+
+1. **Add Hospitable's signing secret.** If your Hospitable webhook shows a signing secret, add it in Cloudflare as a secret named `HOSPITABLE_WEBHOOK_SECRET` (see [adding a secret](#adding-a-secret)). Then click **Test** on the webhook in Hospitable. If the bot doesn't get the test and **Logs** shows `rejected_signature`, delete that secret and the relay goes back to the IP check alone.
+2. **Stay on the Workers Free plan.** On Free, a flood of junk requests can't cost you money. The worst case is that the relay stops for the rest of the day (until 00:00 UTC) once the daily request limit is used up. On the Paid plan, every request is billed.
+3. **Leave Cloudflare's "I'm Under Attack" mode and Bot Fight Mode off** for the relay's address. Hospitable, Quo, and Meta are servers, not browsers, so they can't pass those challenges and your messages would stop arriving.
+
+<details>
+<summary><strong>Optional: block junk traffic before it reaches the relay (needs your own domain)</strong></summary>
+
+The `workers.dev` address can't have firewall rules. If you have a domain on Cloudflare (the free plan is enough), Cloudflare's firewall can block junk requests at the edge, so they never use up the relay's daily requests. Do these in order, so no messages are lost while you switch.
+
+1. **Add a relay address on your domain.** In your relay's GitHub repository, open `wrangler.jsonc`, click the pencil icon, and add this line below `"workers_dev": true,`, using your own domain:
+
+   ```jsonc
+   "routes": [{ "pattern": "relay.yourdomain.com", "custom_domain": true }],
+   ```
+
+   Click **Commit changes**. Cloudflare redeploys the relay in a minute or two.
+2. **Move your channels to the new address.** Open `https://relay.yourdomain.com`, check your password, and copy each link into Hospitable, Quo, and your Meta app in place of the old one. Test each channel.
+3. **Add firewall rules.** In Cloudflare, open your domain, then **Security → WAF → Custom rules**, and create these. For each, click **Edit expression**, paste the expression, choose **Block**, and **Deploy**.
+
+   | Rule name | Expression |
+   | --- | --- |
+   | Relay: only relay paths | `(http.host eq "relay.yourdomain.com" and not (http.request.uri.path eq "/" or starts_with(http.request.uri.path, "/hook/")))` |
+   | Relay: only GET and POST | `(http.host eq "relay.yourdomain.com" and not http.request.method in {"GET" "HEAD" "POST"})` |
+   | Relay: Hospitable only from Hospitable | `(http.host eq "relay.yourdomain.com" and ends_with(http.request.uri.path, "/hospitable") and not ip.src in {38.80.170.0/24})` |
+
+4. **Add a rate limit.** Under **Security → WAF → Rate limiting rules**, create a rule for requests where **Hostname** equals `relay.yourdomain.com` and **URI Path** starts with `/hook/`, counted by **IP**, at more than **50 requests per 10 seconds**, with action **Block** for the shortest time offered. If your plan offers fewer choices, pick the closest ones.
+5. **Turn off the old address.** Once every channel works on the new address, edit `wrangler.jsonc` again, change `"workers_dev": true` to `"workers_dev": false`, and commit. The `workers.dev` address then stops answering, so nobody can go around your firewall rules. Your setup page is now at `https://relay.yourdomain.com`.
+
+</details>
+
 ## Something not working?
 
 <details>
@@ -133,7 +179,8 @@ In Cloudflare, open your relay, then **Logs**, and look at the `outcome` of the 
 | --- | --- |
 | `forwarded` | Delivered. Check your Grok Bot routine. |
 | `forward_failed` | Your bot didn't accept it. Check the Grok Bot URL and key. The relay keeps retrying for about 15 hours. |
-| `rejected_signature` | A Quo or WhatsApp secret doesn't match. Add it again. |
+| `rejected_signature` | A Quo, WhatsApp, or Hospitable secret doesn't match. Add it again. |
+| `rejected_ip` | A request on the Hospitable link didn't come from Hospitable. Expected for junk traffic. |
 | `dormant` | That channel's secret isn't set yet. |
 | `rejected_path` | The webhook link is wrong. Copy it again from your setup page. |
 | `dropped_non_guest` | The message was from you or an automation, not a guest. That's expected. |

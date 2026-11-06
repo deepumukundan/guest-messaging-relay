@@ -1038,7 +1038,8 @@ function setupPage(): Response {
 
 /**
  * GET /hook/<token>/status. Reached only with the right relay password.
- * Says which channels have their secrets set. Never returns secret values.
+ * Says which channels have their secrets set and which optional Hospitable
+ * checks are on. Never returns secret values.
  */
 function handleStatus(request: Request, env: Env): Response {
   if (request.method !== "GET") {
@@ -1050,6 +1051,10 @@ function handleStatus(request: Request, env: Env): Response {
       hospitable: true,
       quo: optionalSecret(env.QUO_WEBHOOK_SECRET) !== null,
       whatsapp: whatsappCreds(env) !== null,
+    },
+    protection: {
+      hospitable_ip_check: ipCheckEnabled(env),
+      hospitable_signature: webhookSecret(env) !== null,
     },
   };
   return Response.json(body, {

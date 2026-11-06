@@ -38,6 +38,7 @@ describe("setup page", () => {
       expect(response.headers.get("cache-control")).toBe("no-store");
       const html = await response.text();
       expect(html).toContain("Guest Messaging Relay");
+      expect(html).toContain("HOSPITABLE_WEBHOOK_SECRET");
       expect(html).not.toContain(PATH_TOKEN);
       expect(html).not.toContain(ROUTINE_URL);
       expect(html).not.toContain("crsr_bare-key");
@@ -50,15 +51,27 @@ describe("setup page", () => {
     expect(await bare.json()).toEqual({
       relay: "ok",
       channels: { hospitable: true, quo: false, whatsapp: false },
+      protection: { hospitable_ip_check: false, hospitable_signature: false },
     });
 
     const full = await get(
       `/hook/${PATH_TOKEN}/status`,
-      relayEnv({ QUO_WEBHOOK_SECRET: "c2VjcmV0", WHATSAPP_VERIFY_TOKEN: "phrase", WHATSAPP_APP_SECRET: "app" }),
+      relayEnv({
+        QUO_WEBHOOK_SECRET: "c2VjcmV0",
+        WHATSAPP_VERIFY_TOKEN: "phrase",
+        WHATSAPP_APP_SECRET: "app",
+        HOSPITABLE_WEBHOOK_SECRET: "hospitable-signing-canary",
+        ENFORCE_HOSPITABLE_IP: undefined,
+      }),
     );
     const body = await full.json();
-    expect(body).toEqual({ relay: "ok", channels: { hospitable: true, quo: true, whatsapp: true } });
+    expect(body).toEqual({
+      relay: "ok",
+      channels: { hospitable: true, quo: true, whatsapp: true },
+      protection: { hospitable_ip_check: true, hospitable_signature: true },
+    });
     expect(JSON.stringify(body)).not.toContain("c2VjcmV0");
+    expect(JSON.stringify(body)).not.toContain("hospitable-signing-canary");
 
     const halfWhatsapp = await get(`/hook/${PATH_TOKEN}/status`, relayEnv({ WHATSAPP_VERIFY_TOKEN: "phrase" }));
     expect(((await halfWhatsapp.json()) as { channels: { whatsapp: boolean } }).channels.whatsapp).toBe(false);
