@@ -146,7 +146,13 @@ Create a webhook for `message.received` on each line you want. See [Webhooks](ht
 
 Either valid scheme is accepted. A timestamp more than 5 minutes off is **401**.
 
-Every `message.received` with `direction` `incoming` is forwarded, from any line. `inbox` is the receiving number in E.164, taken from `to` (a string, or the first E.164 value in an array). Other event types return **200** and are not forwarded.
+Every `message.received` with `direction` `incoming` is forwarded, from any line. Other event types, including `message.delivered`, return **200** and are not forwarded.
+
+Current payloads (API version `2026-03-30`) put the message on `data.resource` (`id`, `direction`, `text`, `createdAt`, `status`) and the parties on `data.context`. `sender.phone` is `senderIdentifier`. `inbox` is the first E.164 value in `recipientIdentifiers`. `phoneNumberId` is not the inbox. See [Webhook event payloads](https://www.quo.com/docs/2026-03-30/webhooks-event-payloads).
+
+Older payloads put the message on `data.object` (`from`, `to`, `body` or `text`, `direction`). `to` may be a string or an array. Those fields are used when they normalize to an E.164 number, including when a payload also has `data.resource`.
+
+A missing or unusable context still forwards the text when the event is an incoming `message.received` with a message id. `inbox` and `sender.phone` are omitted in that case. `created_at` is `data.resource.createdAt` or `data.object.createdAt`, then the envelope `createdAt`.
 
 ## 8. WhatsApp
 
@@ -245,4 +251,4 @@ The line does not include the message, the guest's name, or a full phone number.
 
 ### Temporary payload-shape diagnostics
 
-While `SHAPE_DIAGNOSTICS` is `true` in [src/shape-diagnostics.ts](../src/shape-diagnostics.ts), every verified Quo or WhatsApp POST adds one extra JSON line: `diag` is `payload_shape`, plus `source`, `outcome`, `reason`, and `shape`. `shape` is field names and JSON types. A few enum keys (`type`, `direction`, `status`, `apiVersion`, and the other names in that file) include the value only when it is a short token. Message text, names, phone numbers, emails, ids, URLs, headers, and secrets are not logged. Rejected requests, Hospitable, and the WhatsApp handshake do not emit the line. `outcome` is null when the POST was accepted for delivery; the queue line still reports `forwarded` or `forward_failed`. Delete the module and its call sites after one or two live messages per channel.
+While `SHAPE_DIAGNOSTICS` is `true` in [src/shape-diagnostics.ts](../src/shape-diagnostics.ts), a verified POST from a source listed in `SHAPE_DIAGNOSTICS_SOURCES` adds one extra JSON line: `diag` is `payload_shape`, plus `source`, `outcome`, `reason`, and `shape`. Quo is no longer in that set. WhatsApp still is, until its first live tests. `shape` is field names and JSON types. A few enum keys (`type`, `direction`, `status`, `apiVersion`, and the other names in that file) include the value only when it is a short token. Message text, names, phone numbers, emails, ids, URLs, headers, and secrets are not logged. Rejected requests, Hospitable, and the WhatsApp handshake do not emit the line. `outcome` is null when the POST was accepted for delivery; the queue line still reports `forwarded` or `forward_failed`. Delete the module and its call sites after the WhatsApp samples are captured.

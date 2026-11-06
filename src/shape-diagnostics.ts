@@ -1,9 +1,9 @@
 /**
- * Temporary payload-shape diagnostics for Quo and WhatsApp.
+ * Temporary payload-shape diagnostics.
  *
- * Delete this module and its call sites in src/index.ts after one or two
- * live messages per channel have been captured. Set SHAPE_DIAGNOSTICS to
- * false to stop the extra log line without removing the code.
+ * Quo is off: live deliveries were captured. WhatsApp stays on until its
+ * first live tests. Delete this module and its call sites in src/index.ts
+ * after that. Set SHAPE_DIAGNOSTICS to false to stop every extra log line.
  *
  * The log records field names and JSON types only. A few enum-like keys may
  * include a short token value. Message text, names, phone numbers, emails,
@@ -12,6 +12,9 @@
 
 /** Master switch. One place to turn the extra log line off. */
 export const SHAPE_DIAGNOSTICS = true;
+
+/** Sources that still emit a shape line. Remove a name here to silence it. */
+export const SHAPE_DIAGNOSTICS_SOURCES: ReadonlySet<"quo" | "whatsapp"> = new Set(["whatsapp"]);
 
 /**
  * Stop expanding objects and arrays at this depth.
@@ -74,7 +77,7 @@ export function emitPayloadShape(
   outcome: string | null,
   reason: string | null,
 ): void {
-  if (!SHAPE_DIAGNOSTICS) {
+  if (!SHAPE_DIAGNOSTICS || !SHAPE_DIAGNOSTICS_SOURCES.has(source)) {
     return;
   }
   try {

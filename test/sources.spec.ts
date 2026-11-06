@@ -175,6 +175,62 @@ function whatsappUrl(): string {
   return `https://relay.example/hook/${PATH_TOKEN}/whatsapp`;
 }
 
+const CURRENT_TEXT = "CURRENT-TEXT-CANARY-do-not-log";
+const QUO_LINK = "https://example.com/inbox/fake";
+const RESOURCE_AT = "2026-04-13T12:00:00.000Z";
+const ENVELOPE_AT = "2026-04-13T11:00:00.000Z";
+
+function currentContext(extra: Record<string, unknown> = {}): Record<string, unknown> {
+  return {
+    orgId: "OR-fake",
+    phoneNumberId: "PN-fake",
+    conversationId: "CN-fake",
+    userId: "US-fake",
+    contacts: { ids: ["CT-fake"], lookupStatus: "matched" },
+    senderIdentifier: GUEST_PHONE,
+    recipientIdentifiers: [CABIN_LINE],
+    ...extra,
+  };
+}
+
+/** Observed Quo api version 2026-03-30 shape, with fake values. */
+function currentQuoEvent(overrides: {
+  type?: string;
+  direction?: string;
+  status?: string;
+  id?: string;
+  eventId?: string;
+  text?: string;
+  omitText?: boolean;
+  omitResourceCreatedAt?: boolean;
+  context?: unknown;
+} = {}): Record<string, unknown> {
+  const resource: Record<string, unknown> = {
+    id: overrides.id ?? "AC-current-1",
+    direction: overrides.direction ?? "incoming",
+    media: [],
+    status: overrides.status ?? "received",
+    createdAt: RESOURCE_AT,
+  };
+  if (!overrides.omitText) {
+    resource.text = overrides.text ?? CURRENT_TEXT;
+  }
+  if (overrides.omitResourceCreatedAt) {
+    delete resource.createdAt;
+  }
+  return {
+    id: overrides.eventId ?? "EV-current-1",
+    apiVersion: "2026-03-30",
+    createdAt: ENVELOPE_AT,
+    type: overrides.type ?? "message.received",
+    data: {
+      resource,
+      context: overrides.context === undefined ? currentContext() : overrides.context,
+      links: { quo: QUO_LINK },
+    },
+  };
+}
+
 function quoEvent(overrides: Record<string, unknown> = {}): Record<string, unknown> {
   const objectOverrides =
     overrides.object && typeof overrides.object === "object" && !Array.isArray(overrides.object)
@@ -553,6 +609,200 @@ describe("quo and whatsapp sources", () => {
     expect(response.status).toBe(200);
     await settle(ctx);
     expect(captured.count).toBe(1);
+  });
+
+  it("normalizes a current Quo message.received and keeps the legacy object when both are present", async () => {
+    const captured = captureRoutine();
+    const raw = JSON.stringify(currentQuoEvent());
+    const { response, ctx } = await post(quoUrl(), raw, { "openphone-signature": await quoHeader(raw) });
+    expect(response.status).toBe(200);
+    expect(await response.json()).toEqual({ ok: true });
+    await settle(ctx);
+    expect(captured.bodies[0]).toEqual({
+      source: "quo",
+      event_type: "message",
+      inbox: CABIN_LINE,
+      sender: { phone: GUEST_PHONE },
+      message_id: "AC-current-1",
+      body: CURRENT_TEXT,
+      created_at: RESOURCE_AT,
+    });
+    expect(await env.DEDUPE.get("quo:message:AC-current-1")).toBe("1");
+    const again = JSON.stringify(currentQuoEvent({ eventId: "EV-current-retry" }));
+    const duplicate = await post(quoUrl(), again, { "openphone-signature": await quoHeader(again) });
+    expect(duplicate.response.status).toBe(200);
+    await settle(duplicate.ctx);
+    expect(captured.count).toBe(1);
+    expect(jsonLogs(logs.lines).map((entry) => entry.outcome)).toEqual(["forwarded", "duplicate"]);
+
+    const mixed = quoEvent({ id: "EV-both", object: { id: "AC-legacy-wins" } });
+    const mixedData = mixed.data as Record<string, unknown>;
+    mixedData.resource = {
+      id: "AC-current-loses",
+      direction: "incoming",
+      text: CURRENT_TEXT,
+      media: [],
+      status: "received",
+      createdAt: RESOURCE_AT,
+    };
+    mixedData.context = currentContext({
+      senderIdentifier: OTHER_GUEST,
+      recipientIdentifiers: [SHARED_LINE],
+    });
+    mixedData.links = { quo: QUO_LINK };
+    const mixedRaw = JSON.stringify(mixed);
+    const legacy = await post(quoUrl(), mixedRaw, { "openphone-signature": await quoHeader(mixedRaw) });
+    expect(legacy.response.status).toBe(200);
+    await settle(legacy.ctx);
+    expect(captured.bodies[1]).toEqual({
+      source: "quo",
+      event_type: "message",
+      inbox: CABIN_LINE,
+      sender: { phone: GUEST_PHONE },
+      message_id: "AC-legacy-wins",
+      body: BODY_CANARY,
+      created_at: "2022-01-23T16:55:52.420Z",
+    });
+
+    const logged = logs.lines.join("\n");
+    for (const secret of [CURRENT_TEXT, BODY_CANARY, QUO_LINK, GUEST_PHONE, CABIN_LINE, OTHER_GUEST, "OR-fake", "CT-fake", "US-fake", "CN-fake", "PN-fake"]) {
+      expect(logged).not.toContain(secret);
+    }
+  });
+
+  it("rejects a current Quo payload with a bad signature and ignores outgoing or other events", async () => {
+    const captured = captureRoutine();
+    const raw = JSON.stringify(currentQuoEvent({ eventId: "EV-current-sig", id: "AC-current-sig" }));
+    const bad = await post(quoUrl(), raw, { "openphone-signature": "hmac;1;1;not-a-signature" });
+    expect(bad.response.status).toBe(401);
+    expect(await bad.response.json()).toEqual({ error: "unauthorized" });
+    await settle(bad.ctx);
+
+    const delivered = JSON.stringify(
+      currentQuoEvent({
+        eventId: "EV-delivered-current",
+        id: "AC-delivered-current",
+        type: "message.delivered",
+        direction: "outgoing",
+        status: "delivered",
+        text: "DELIVERED-TEXT-CANARY",
+      }),
+    );
+    const deliveredPost = await post(quoUrl(), delivered, { "openphone-signature": await quoHeader(delivered) });
+    expect(deliveredPost.response.status).toBe(200);
+    await settle(deliveredPost.ctx);
+
+    const outgoing = JSON.stringify(
+      currentQuoEvent({
+        eventId: "EV-outgoing-current",
+        id: "AC-outgoing-current",
+        direction: "outgoing",
+        text: "OUTGOING-TEXT-CANARY",
+      }),
+    );
+    const outgoingPost = await post(quoUrl(), outgoing, { "openphone-signature": await quoHeader(outgoing) });
+    expect(outgoingPost.response.status).toBe(200);
+    await settle(outgoingPost.ctx);
+
+    const other = JSON.stringify(
+      currentQuoEvent({
+        eventId: "EV-call-current",
+        id: "AC-call-current",
+        type: "call.ringing",
+        direction: "incoming",
+      }),
+    );
+    const otherPost = await post(quoUrl(), other, { "openphone-signature": await quoHeader(other) });
+    expect(otherPost.response.status).toBe(200);
+    await settle(otherPost.ctx);
+
+    expect(captured.count).toBe(0);
+    expect(jsonLogs(logs.lines).map((entry) => entry.outcome)).toEqual([
+      "rejected_signature",
+      "ignored",
+      "ignored",
+      "ignored",
+    ]);
+    expect(jsonLogs(logs.lines).filter((entry) => entry.outcome === "ignored").map((entry) => entry.reason)).toEqual([
+      "event_type",
+      "direction",
+      "event_type",
+    ]);
+    const logged = logs.lines.join("\n");
+    expect(logged).not.toContain(CURRENT_TEXT);
+    expect(logged).not.toContain("DELIVERED-TEXT-CANARY");
+    expect(logged).not.toContain("OUTGOING-TEXT-CANARY");
+    expect(logged).not.toContain(GUEST_PHONE);
+    expect(logged).not.toContain(QUO_LINK);
+  });
+
+  it("forwards a current message when context is missing or unusable, and skips non-numbers", async () => {
+    const captured = captureRoutine();
+    const missingRaw = JSON.stringify(
+      currentQuoEvent({ eventId: "EV-no-context", id: "AC-no-context", context: null, omitResourceCreatedAt: true }),
+    );
+    const missing = await post(quoUrl(), missingRaw, { "openphone-signature": await quoHeader(missingRaw) });
+    expect(missing.response.status).toBe(200);
+    await settle(missing.ctx);
+    expect(captured.bodies[0]).toEqual({
+      source: "quo",
+      event_type: "message",
+      sender: {},
+      message_id: "AC-no-context",
+      body: CURRENT_TEXT,
+      created_at: ENVELOPE_AT,
+    });
+
+    const brokenRaw = JSON.stringify(
+      currentQuoEvent({
+        eventId: "EV-bad-context",
+        id: "AC-bad-context",
+        context: { senderIdentifier: "Ada Guest", recipientIdentifiers: [1, "nope", { n: 1 }], phoneNumberId: "PN-fake" },
+      }),
+    );
+    const broken = await post(quoUrl(), brokenRaw, { "openphone-signature": await quoHeader(brokenRaw) });
+    expect(broken.response.status).toBe(200);
+    await settle(broken.ctx);
+    expect(captured.bodies[1]).toEqual({
+      source: "quo",
+      event_type: "message",
+      sender: {},
+      message_id: "AC-bad-context",
+      body: CURRENT_TEXT,
+      created_at: RESOURCE_AT,
+    });
+
+    const pickedRaw = JSON.stringify(
+      currentQuoEvent({
+        eventId: "EV-pick-line",
+        id: "AC-pick-line",
+        context: currentContext({
+          recipientIdentifiers: ["PN-fake", "not-a-phone", SHARED_LINE, ANY_LINE],
+        }),
+      }),
+    );
+    const picked = await post(quoUrl(), pickedRaw, { "openphone-signature": await quoHeader(pickedRaw) });
+    expect(picked.response.status).toBe(200);
+    await settle(picked.ctx);
+    expect(captured.bodies[2]).toMatchObject({
+      inbox: SHARED_LINE,
+      sender: { phone: GUEST_PHONE },
+      message_id: "AC-pick-line",
+    });
+
+    const noIdRaw = JSON.stringify(currentQuoEvent({ eventId: "EV-no-id", id: "", omitText: true }));
+    const noId = await post(quoUrl(), noIdRaw, { "openphone-signature": await quoHeader(noIdRaw) });
+    expect(noId.response.status).toBe(200);
+    await settle(noId.ctx);
+
+    expect(captured.count).toBe(3);
+    expect(jsonLogs(logs.lines).map((entry) => entry.outcome)).toContain("dropped_no_id");
+    const logged = logs.lines.join("\n");
+    expect(logged).not.toContain(CURRENT_TEXT);
+    expect(logged).not.toContain("Ada Guest");
+    expect(logged).not.toContain(QUO_LINK);
+    expect(logged).not.toContain(SHARED_LINE);
+    expect(logged).not.toContain("PN-fake");
   });
 
   it("keeps POST /hook/<token>/hospitable on the Hospitable source", async () => {
