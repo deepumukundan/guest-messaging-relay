@@ -81,8 +81,12 @@ function captureLogs(): { lines: string[]; restore: () => void } {
   };
 }
 
+/** Status lines only. The temporary payload_shape line is asserted on its own. */
 function jsonLogs(lines: string[]): Record<string, unknown>[] {
-  return lines.filter((line) => line.startsWith("{")).map((line) => JSON.parse(line) as Record<string, unknown>);
+  return lines
+    .filter((line) => line.startsWith("{"))
+    .map((line) => JSON.parse(line) as Record<string, unknown>)
+    .filter((entry) => entry.diag !== "payload_shape");
 }
 
 async function hmacBase64(keyBytes: Uint8Array, data: Uint8Array): Promise<string> {
