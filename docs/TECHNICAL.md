@@ -242,3 +242,7 @@ Each log line is JSON with `relay` set to `guest-messaging-relay`.
 - **`routine_status`** is the bot's HTTP status, or `0` for a network error or timeout.
 
 The line does not include the message, the guest's name, or a full phone number.
+
+### Temporary payload-shape diagnostics
+
+While `SHAPE_DIAGNOSTICS` is `true` in [src/shape-diagnostics.ts](../src/shape-diagnostics.ts), every verified Quo or WhatsApp POST adds one extra JSON line: `diag` is `payload_shape`, plus `source`, `outcome`, `reason`, and `shape`. `shape` is field names and JSON types. A few enum keys (`type`, `direction`, `status`, `apiVersion`, and the other names in that file) include the value only when it is a short token. Message text, names, phone numbers, emails, ids, URLs, headers, and secrets are not logged. Rejected requests, Hospitable, and the WhatsApp handshake do not emit the line. `outcome` is null when the POST was accepted for delivery; the queue line still reports `forwarded` or `forward_failed`. Delete the module and its call sites after one or two live messages per channel.

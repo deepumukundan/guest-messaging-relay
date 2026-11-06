@@ -21,6 +21,7 @@ import {
   retryDelaySeconds,
 } from "./lib";
 import { SETUP_PAGE_HTML } from "./setup-page";
+import { emitPayloadShape } from "./shape-diagnostics";
 
 
 /** Log prefix. Every status line is JSON and includes this as `relay`. */
@@ -1061,6 +1062,24 @@ function logSource(
   logEvent({ ...fields, source }, level);
 }
 
+/**
+ * Extra shape line for a verified Quo or WhatsApp POST. `outcome` is null when
+ * the request was accepted for delivery; the queue status line still reports
+ * forwarded or forward_failed. Failures here must not change the response.
+ */
+function logShape(
+  source: "quo" | "whatsapp",
+  body: Uint8Array,
+  outcome: Outcome | null,
+  reason: LogFields["reason"] | null = null,
+): void {
+  try {
+    emitPayloadShape(LOG_PREFIX, source, body, outcome, reason);
+  } catch {
+    // Diagnostics must not change the response.
+  }
+}
+
 function logEvent(fields: LogFields, level: "log" | "error" = "log"): void {
   const record: Record<string, string | number | boolean | null> = {
     relay: LOG_PREFIX,
@@ -1135,6 +1154,7 @@ async function handleQuo(request: Request, env: Env, ctx: ExecutionContext): Pro
       outcome: "invalid_payload",
       routine_status: null,
     });
+    logShape("quo", body, "invalid_payload");
     return json({ error: "invalid_payload" }, 400);
   }
 
@@ -1160,6 +1180,7 @@ async function handleQuo(request: Request, env: Env, ctx: ExecutionContext): Pro
       event_type: eventType ?? undefined,
       reason: "event_type",
     });
+    logShape("quo", body, "ignored", "event_type");
     return json({ ok: true }, 200);
   }
 
@@ -1172,6 +1193,7 @@ async function handleQuo(request: Request, env: Env, ctx: ExecutionContext): Pro
       event_type: "message.received",
       reason: "direction",
     });
+    logShape("quo", body, "ignored", "direction");
     return json({ ok: true }, 200);
   }
 
@@ -1185,6 +1207,7 @@ async function handleQuo(request: Request, env: Env, ctx: ExecutionContext): Pro
       routine_status: null,
       event_type: "message.received",
     });
+    logShape("quo", body, "dropped_no_id");
     return json({ ok: true }, 200);
   }
 
@@ -1200,6 +1223,7 @@ async function handleQuo(request: Request, env: Env, ctx: ExecutionContext): Pro
       routine_status: null,
       event_type: "message.received",
     });
+    logShape("quo", body, "dedupe_read_failed");
     return json({ error: "dedupe_unavailable" }, 500);
   }
   if (seen !== null) {
@@ -1210,6 +1234,7 @@ async function handleQuo(request: Request, env: Env, ctx: ExecutionContext): Pro
       routine_status: null,
       event_type: "message.received",
     });
+    logShape("quo", body, "duplicate");
     return json({ ok: true }, 200);
   }
 
@@ -1235,8 +1260,10 @@ async function handleQuo(request: Request, env: Env, ctx: ExecutionContext): Pro
     },
   ]);
   if (!queued) {
+    logShape("quo", body, "queue_failed");
     return json({ error: "queue_unavailable" }, 500);
   }
+  logShape("quo", body, null);
   return json({ ok: true }, 200);
 }
 
@@ -1288,6 +1315,7 @@ async function handleWhatsapp(request: Request, env: Env, ctx: ExecutionContext)
       outcome: "invalid_payload",
       routine_status: null,
     });
+    logShape("whatsapp", body, "invalid_payload");
     return json({ ok: true }, 200);
   }
 
@@ -1359,6 +1387,7 @@ async function handleWhatsapp(request: Request, env: Env, ctx: ExecutionContext)
             routine_status: null,
             event_type: "messages",
           });
+          logShape("whatsapp", body, "dedupe_read_failed");
           return json({ error: "dedupe_unavailable" }, 500);
         }
         if (seen !== null) {
@@ -1405,8 +1434,10 @@ async function handleWhatsapp(request: Request, env: Env, ctx: ExecutionContext)
       })),
     );
     if (!queued) {
+      logShape("whatsapp", body, "queue_failed");
       return json({ error: "queue_unavailable" }, 500);
     }
+    logShape("whatsapp", body, null);
   } else if (decisions === 0) {
     logSource("whatsapp", {
       event_id: null,
@@ -1416,6 +1447,9 @@ async function handleWhatsapp(request: Request, env: Env, ctx: ExecutionContext)
       event_type: "messages",
       ...(sawStatuses ? { reason: "statuses" as const } : {}),
     });
+    logShape("whatsapp", body, "ignored", sawStatuses ? "statuses" : null);
+  } else {
+    logShape("whatsapp", body, null);
   }
   return json({ ok: true }, 200);
 }
