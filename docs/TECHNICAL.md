@@ -166,6 +166,8 @@ https://<worker>.<account-subdomain>.workers.dev/hook/<RELAY_PATH_TOKEN>/whatsap
 
 Use the same string for Meta's verify token and `WHATSAPP_VERIFY_TOKEN`. Put the app secret in `WHATSAPP_APP_SECRET`. See [Getting started with webhooks](https://developers.facebook.com/docs/graph-api/webhooks/getting-started/). Both secrets must be on the Worker before you save the callback URL in Meta, or the handshake gets **503**.
 
+Apps made with the **Connect with customers through WhatsApp** use case keep this under **Use cases → Customize → Configuration**. Meta notes that some webhooks are not sent while an app is in Dev mode, so publish it (Live) before relying on real guest traffic. See [WhatsApp webhooks](https://developers.facebook.com/docs/whatsapp/cloud-api/guides/set-up-webhooks/).
+
 - **Handshake.** `GET` with `hub.mode=subscribe` and a matching `hub.verify_token` returns `hub.challenge` as text.
 - **Messages.** `POST` requires `X-Hub-Signature-256: sha256=<hex HMAC-SHA256 of the raw body>`.
   - Text messages are forwarded.

@@ -8,7 +8,7 @@
         "description": "Your new relay password. Have your password manager make one with 40 letters and numbers (no symbols), and save it there. You'll type it on your relay's setup page."
       },
       "RESPONDER_WEBHOOK_URL": {
-        "description": "Your Grok Bot webhook URL. In the Grok Bot app, open your bot, then Details, then the routine that runs 'When a webhook fires', and scroll to the Webhook section. Copy the 'POST to' value."
+        "description": "Your Grok Bot webhook URL. In the Grok Bot app, open your bot, then Details, then the routine that runs 'When a webhook fires', and scroll to the Webhook section. Copy the 'POST to' value. No such routine? Ask your bot to create one (see the README)."
       },
       "RESPONDER_AUTH_HEADER": {
         "description": "Your Grok Bot key, from the same Webhook section (the 'key' row). Paste it as is."

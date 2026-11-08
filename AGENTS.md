@@ -24,6 +24,7 @@ Setup is done in the human's web browser with the **Deploy to Cloudflare** butto
 
 1. **Before starting,** confirm the human has a Cloudflare account and a GitHub account (both free). Ask which channels they use: Hospitable, Quo, WhatsApp, or several.
    - They need a paid Grok Bot plan, and their Grok Bot routine's webhook URL and key. In the Grok Bot app (desktop or phone), they open the bot, then the **Details** tab, then the routine that runs **When a webhook fires**. They scroll to the **Webhook** section at the bottom, where **POST to** is the URL and **key** is the key. The relay adds `Bearer` itself, so the **header** row isn't needed.
+   - **No such routine yet?** The simplest way is to have them ask the bot in chat to create a routine that runs when a webhook fires and handles incoming guest messages. README has a sample message under "Don't have a webhook routine yet?". The bot also needs its own MCP connection to each service to reply.
 2. **Deploy** (README step 1).
    - The human clicks the button, logs in to Cloudflare, picks a `workers.dev` subdomain if asked, and connects GitHub.
    - **Project name:** keep `guest-messaging-relay`. If Cloudflare says a repository with that name already exists (they already have a copy or a fork), add a suffix such as `-2`. The project name becomes the Worker's name and the start of its address. Keep the suggested KV namespace and Queue names.
@@ -33,7 +34,11 @@ Setup is done in the human's web browser with the **Deploy to Cloudflare** butto
    - They type the relay password and click **Check**. A green message means it works, and the page then shows each channel's webhook link with a **Copy** button and a Ready badge.
    - If the page reports a problem, use the README's "Something not working?" section.
 4. **Connect channels** (README step 3), only the ones they use. Start with Hospitable: **Apps → Tools → Webhooks**, add a webhook with the copied link, select Messages, Reservations, and Reviews, **Save**, then **Test**.
-   - **WhatsApp:** this works only with a WhatsApp Business number connected to a Meta app (WhatsApp Cloud API). The regular WhatsApp app, or the WhatsApp Business app on its own, can't send webhooks. Both WhatsApp secrets must be added before the human saves the callback URL in Meta. The setup page shows **Ready** once they are.
+   - **WhatsApp:** this works only with a WhatsApp number connected to a Meta app (WhatsApp Cloud API). The regular WhatsApp app, or the WhatsApp Business app on its own, can't send webhooks. Follow the README's WhatsApp section in order: A) create the Meta app with the **Connect with customers through WhatsApp** use case, B) add and register the real number, C) connect it to the relay, D) test.
+     - A number already on WhatsApp must be deleted from WhatsApp first, and its phone chats are lost. Warn the human before they do it. A number never used on WhatsApp is easier.
+     - Both WhatsApp secrets must be added before the human saves the callback URL in Meta. The setup page shows **Ready** once they are.
+     - Meta says some webhooks aren't sent while the app is in development, so the app should be published (Live).
+     - Meta's pages move. If a button isn't where the README says, use Meta's [Get started](https://developers.facebook.com/documentation/business-messaging/whatsapp/get-started) guide.
    - **Quo:** the signing secret appears after the webhook is created, so the order is webhook first, then the secret.
    - New secrets are added in Cloudflare under **Workers & Pages → their relay → Settings → Variables and Secrets** as type **Secret**, then **Deploy**.
 5. **Test.** Ask the human to send a message to one of their numbers. The bot should get it within seconds. If not, have them read the `outcome` field under **Logs** for the Worker, and use the table in [README.md](README.md#something-not-working).

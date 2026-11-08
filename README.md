@@ -43,7 +43,22 @@ You can do this in the Grok Bot app on your computer or phone.
    - **key**: your **key**
    - **header**: not needed, because the relay adds it for you
 
-No routine that says **When a webhook fires**? Create a routine, choose **When a webhook fires** as its trigger, and tell it what to do with guest messages.
+No routine that says **When a webhook fires**? See the next section.
+
+</details>
+
+<details>
+<summary><strong>Don't have a webhook routine yet?</strong></summary>
+
+The easiest way is to ask your bot to make one. Open a chat with your bot and send something like:
+
+> *Create a new routine that runs when a webhook fires. It will receive incoming guest messages from Hospitable, Quo, and WhatsApp, sent by my guest messaging relay. Each message is JSON with a `source` field (`hospitable`, `quo`, or `whatsapp`), the guest's message in `body`, and the sender in `sender`. Hospitable also sends reservation and review updates. Read each message, work out which guest and home it's about, and reply to the guest through the same service using your connections.*
+
+Change the wording to suit how you want guests answered. When the bot has made the routine, open it under **Details → Routines** and check that it says **When a webhook fires**. Its **Webhook** section then has the URL and key you need.
+
+You can also make it yourself: create a routine, choose **When a webhook fires** as its trigger, and write the instructions.
+
+**Replies.** The relay only brings guest messages *to* your bot. To answer, your bot needs its own MCP connection to each service you use.
 
 </details>
 
@@ -95,14 +110,50 @@ That's it. Your bot now sees new guest messages from Hospitable.
 <details>
 <summary><strong>Also using WhatsApp Business?</strong></summary>
 
-This needs a **WhatsApp Business** number connected to a **Meta app** (Meta's WhatsApp Cloud API). The regular WhatsApp app, and the WhatsApp Business app on its own, can't send messages to the relay.
+This needs a WhatsApp number connected to a **Meta app** through Meta's **WhatsApp Cloud API**. The regular WhatsApp app, and the WhatsApp Business app on its own, can't send messages to the relay. The first time, allow 30 minutes or so for the Meta part.
 
-Do these in order, because Meta checks the link right away.
+Meta's own guide, with screenshots, is [WhatsApp Cloud API: Get started](https://developers.facebook.com/documentation/business-messaging/whatsapp/get-started). Meta changes its pages often, so if a button below has moved, that guide has the current names.
 
-1. Make up a phrase, and add it in Cloudflare as a secret named `WHATSAPP_VERIFY_TOKEN`. See [adding a secret](#adding-a-secret) below.
-2. Add your Meta app's secret as a secret named `WHATSAPP_APP_SECRET`. It's in your Meta app under **App settings → Basic → App secret**.
-3. Check your setup page again. WhatsApp should say **Ready**. Copy its link.
-4. In your Meta app, open **WhatsApp → Configuration**. Paste the link as the callback URL, enter the same phrase as the verify token, and subscribe to **messages**.
+**A. Create the Meta app**
+
+1. Go to [Meta for Developers](https://developers.facebook.com/apps) and log in with Facebook. If asked, register as a developer.
+2. Click **Create App**. Enter a name, such as *Guest Messaging Relay*, and your email.
+3. Choose the use case **Connect with customers through WhatsApp** and click **Next**.
+4. Choose your business portfolio, or create one. Click **Next**, then **Create app**.
+5. On the **Quickstart** page, click **Start using the API**. On **API Setup**, choose your WhatsApp Business account, or click **Create a WhatsApp Business account**.
+
+Meta gives you a free **test number** straight away. You can use it to check the relay before moving your real number (see D).
+
+**B. Add your real number**
+
+Guests message your real business number, so it has to be added to the app.
+
+- **Choose the number.** A number that is already on WhatsApp (the regular app or the WhatsApp Business app) has to be deleted from WhatsApp first, and its chats on the phone are lost, so back them up. A number that has never been on WhatsApp is easiest, for example a Quo number. It must be able to receive a text or a call for the code.
+- **Add it.** On **API Setup**, click **Add phone number** (it's also in WhatsApp Manager under **Account tools → Phone numbers**). Enter the name guests will see, then the code Meta sends.
+- **Register it.** Meta asks you to register the number before it works, which also sets a 6-digit PIN. Follow [Register a business phone number](https://developers.facebook.com/documentation/business-messaging/whatsapp/business-phone-numbers/registration). If it asks you to make an API call, an AI assistant can talk you through doing it in Meta's Graph API Explorer.
+
+Receiving guest messages doesn't need a payment method. Meta asks for one only when your business starts conversations.
+
+**C. Connect it to the relay**
+
+Do these in order, because Meta checks the link as soon as you save it.
+
+1. Have your password manager make a phrase of letters and numbers, and save it there. Add it in Cloudflare as a secret named `WHATSAPP_VERIFY_TOKEN`. See [adding a secret](#adding-a-secret) below.
+2. In your Meta app, open **App settings → Basic** and click **Show** next to **App secret**. Add it in Cloudflare as a secret named `WHATSAPP_APP_SECRET`.
+3. Check your setup page again. WhatsApp should say **Ready**. Click **Copy link** under it.
+4. In your Meta app, open **Use cases**, click **Customize** next to WhatsApp, then **Configuration**. In older apps it's **WhatsApp → Configuration**.
+5. Paste the link as the **Callback URL**, paste the same phrase as the **Verify token**, and click **Verify and save**. An error here usually means a secret from steps 1–2 is missing or different.
+6. Under **Webhook fields**, click **Manage** and subscribe to **messages**.
+7. In the left menu, click **Publish** to put the app in Live mode. Meta says some webhooks aren't sent while an app is still in development. It may ask for a few details first, such as a privacy policy link.
+
+**D. Test it**
+
+- **Test number:** on **API Setup**, add your own phone as a **To** number and click **Send message**. Reply to that message on your phone. Your bot should get the reply within seconds.
+- **Real number:** send a WhatsApp message to your business number from another phone.
+
+If the bot doesn't get it, see [My bot didn't get a message](#something-not-working).
+
+**Replies.** The relay only receives. For your bot to answer on WhatsApp, it needs its own WhatsApp connection.
 
 </details>
 
