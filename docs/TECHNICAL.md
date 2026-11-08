@@ -168,6 +168,8 @@ Use the same string for Meta's verify token and `WHATSAPP_VERIFY_TOKEN`. Put the
 
 Apps made with the **Connect with customers through WhatsApp** use case keep this under **Use cases → Customize → Configuration**. Meta notes that some webhooks are not sent while an app is in Dev mode, so publish it (Live) before relying on real guest traffic. See [WhatsApp webhooks](https://developers.facebook.com/docs/whatsapp/cloud-api/guides/set-up-webhooks/).
 
+The relay itself costs nothing on Meta's side; inbound messages are free. The responder's replies are Meta service messages: as of October 1, 2026, 1,000 a month per business phone number are free and the rest are charged; template messages are always charged. See [Pricing](https://developers.facebook.com/documentation/business-messaging/whatsapp/pricing).
+
 - **Handshake.** `GET` with `hub.mode=subscribe` and a matching `hub.verify_token` returns `hub.challenge` as text.
 - **Messages.** `POST` requires `X-Hub-Signature-256: sha256=<hex HMAC-SHA256 of the raw body>`.
   - Text messages are forwarded.

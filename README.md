@@ -25,7 +25,7 @@ The relay runs free on Cloudflare, needs no coding, and takes about 10 minutes t
 
 You'll need:
 
-- A **paid Grok Bot plan**. This is the only paid part; everything else is free.
+- A **paid Grok Bot plan**. This is the only paid part; everything else is free. (WhatsApp has a free monthly limit; see its section below.)
 - A free [Cloudflare account](https://dash.cloudflare.com/sign-up)
 - A free [GitHub account](https://github.com/signup)
 - Your Grok Bot routine's **webhook URL** and **key** (see below)
@@ -112,6 +112,14 @@ That's it. Your bot now sees new guest messages from Hospitable.
 
 This needs a WhatsApp number connected to a **Meta app** through Meta's **WhatsApp Cloud API**. The regular WhatsApp app, and the WhatsApp Business app on its own, can't send messages to the relay. The first time, allow 30 minutes or so for the Meta part.
 
+**Before you switch, know how it differs from the WhatsApp Business app:**
+
+- **You lose the phone app for that number.** A number has to be deleted from the WhatsApp app before it can be connected, and its chats on the phone are lost. After that, you and your bot reply through the Cloud API, not the app. (Meta has a "coexistence" option that keeps both, but only through [Meta partners](https://developers.facebook.com/documentation/business-messaging/whatsapp/embedded-signup/onboarding-business-app-users/).)
+- **The 24-hour rule.** You can reply freely for 24 hours after a guest's last message. After that, you can only send messages from templates Meta has approved in advance.
+- **Cost.** Messages from guests are free. Your replies inside the 24-hour window are free up to 1,000 a month per number, and charged after that. Template messages are always charged. The app has none of these limits. Check [Meta's current prices](https://developers.facebook.com/documentation/business-messaging/whatsapp/pricing), as they change.
+
+If you'd rather keep your current number on the app, use a new number for the relay, or leave WhatsApp out and use Hospitable and Quo.
+
 Meta's own guide, with screenshots, is [WhatsApp Cloud API: Get started](https://developers.facebook.com/documentation/business-messaging/whatsapp/get-started). Meta changes its pages often, so if a button below has moved, that guide has the current names.
 
 **A. Create the Meta app**
@@ -132,7 +140,7 @@ Guests message your real business number, so it has to be added to the app.
 - **Add it.** On **API Setup**, click **Add phone number** (it's also in WhatsApp Manager under **Account tools → Phone numbers**). Enter the name guests will see, then the code Meta sends.
 - **Register it.** Meta asks you to register the number before it works, which also sets a 6-digit PIN. Follow [Register a business phone number](https://developers.facebook.com/documentation/business-messaging/whatsapp/business-phone-numbers/registration). If it asks you to make an API call, an AI assistant can talk you through doing it in Meta's Graph API Explorer.
 
-Receiving guest messages doesn't need a payment method. Meta asks for one only when your business starts conversations.
+You don't need a payment method to start. Without one, Meta stops delivering your replies once the free 1,000 a month are used, and you can't send template messages.
 
 **C. Connect it to the relay**
 
