@@ -243,3 +243,7 @@ In Cloudflare, open your relay, then **Logs**, and look at the `outcome` of the 
 </details>
 
 Developers: see [docs/TECHNICAL.md](docs/TECHNICAL.md) for how it works and how to deploy from your own computer.
+
+## License
+
+[MIT](LICENSE). You are free to use, fork, modify, and share this relay.
