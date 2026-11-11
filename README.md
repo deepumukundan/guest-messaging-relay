@@ -58,7 +58,7 @@ Change the wording to suit how you want guests answered. When the bot has made t
 
 You can also make it yourself: create a routine, choose **When a webhook fires** as its trigger, and write the instructions.
 
-**Replies.** The relay only brings guest messages *to* your bot. To answer, your bot needs its own MCP connection to each service you use.
+**Replies.** The relay only brings guest messages *to* your bot. To answer, your bot needs its own MCP connection to each service you use. Whether it asks your approval first or replies on its own is set in the routine; see [Step 4](#step-4-decide-how-your-bot-replies).
 
 </details>
 
@@ -170,6 +170,21 @@ If the bot doesn't get it, see [My bot didn't get a message](#something-not-work
 1. Open [Workers & Pages](https://dash.cloudflare.com/?to=/:account/workers-and-pages) in Cloudflare and click your relay (its project name).
 2. Go to **Settings → Variables and Secrets** and click **Add**.
 3. Choose type **Secret**, enter the name and value, and click **Deploy**.
+
+## Step 4: Decide how your bot replies
+
+The relay only delivers guest messages to your bot. How the bot answers is up to the instructions in your routine, and it doesn't have to ask your permission every time. Most people go through two stages:
+
+1. **Start in approval mode.** Tell the bot to draft each reply and wait for your OK before anything is sent. You see how it words things and how it handles odd questions, and nothing reaches a guest without your say-so.
+2. **Switch to automatic once you trust it.** After a few weeks of approving drafts you'll know what it gets right. Then change the routine so it answers inquiries and messages from Hospitable, Quo, and WhatsApp by itself, and you only step in when it escalates to you.
+
+Automatic replies work well once these are in place:
+
+- **Written SOPs (standard procedures).** Check-in and check-out, house rules, parking, early arrival, late departure, refunds, and the other questions guests ask. Give the bot these in its routine instructions or a knowledge base it can read. The better they are, the better the answers.
+- **Escalation rules.** Spell out what the bot must hand to you instead of answering: complaints, safety or damage problems, refund or discount requests, anything it can't find in your SOPs, and anything it's unsure about. Say who it should alert and how, for example with a message to you or a task.
+- **A quick review at first.** Even in automatic mode, skim recent conversations now and then, and tighten the SOPs where an answer wasn't what you wanted.
+
+You can switch back to approval mode at any time by editing the routine's instructions. You can also run different channels differently, for example automatic on Hospitable and approval on WhatsApp.
 
 ## Security
 
