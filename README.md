@@ -21,6 +21,19 @@ The relay runs free on Cloudflare, needs no coding, and takes about 10 minutes t
 > **Want help?** Paste this into any AI assistant and it will walk you through it:
 > *Help me set up the guest messaging relay from https://github.com/deepumukundan/guest-messaging-relay. Follow AGENTS.md in that repository.*
 
+## Index
+
+| # | Section | What it covers |
+|---|---------|----------------|
+| 0 | [Before you start](#before-you-start) | What you need ready |
+| 1 | [Deploy the relay](#step-1-deploy-the-relay) | One-click deploy to Cloudflare |
+| 2 | [Open your setup page](#step-2-open-your-setup-page) | Check the relay and copy your webhook links |
+| 3 | [Connect Hospitable](#step-3-connect-hospitable) | Connect Hospitable, plus optional Quo and WhatsApp; [adding a secret](#adding-a-secret) |
+| 4 | [Decide how your bot replies](#step-4-decide-how-your-bot-replies) | Approval mode or automatic replies |
+| 5 | [Security](#security) | Recommended protection |
+| 6 | [Something not working?](#something-not-working) | Troubleshooting table |
+| 7 | [License](#license) | Terms of use |
+
 ## Before you start
 
 You'll need:
